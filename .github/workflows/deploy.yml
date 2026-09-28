@@ -26,20 +26,17 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: 'apps/web-expert/package-lock.json'
 
       - name: Install dependencies
         run: npm ci
-        working-directory: apps/web-expert
 
       - name: Build
         run: npm run build
-        working-directory: apps/web-expert
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./apps/web-expert/dist
+          path: ./out
 
   deploy:
     environment:

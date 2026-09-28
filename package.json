@@ -1,0 +1,12 @@
+{
+  "name": "agrisage",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix apps/web-expert run dev",
+    "build": "npm --prefix apps/web-expert install && npm --prefix apps/web-expert run build && node -e \"require('fs').cpSync('apps/web-expert/dist', 'out', {recursive: true})\"",
+    "start": "npm --prefix apps/web-expert run preview",
+    "lint": "npm --prefix apps/web-expert run lint"
+  },
+  "dependencies": {}
+}
