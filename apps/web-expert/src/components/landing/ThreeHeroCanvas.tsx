@@ -20,13 +20,13 @@ export const ThreeHeroCanvas: React.FC<ThreeHeroCanvasProps> = ({ className = ''
     const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
     camera.position.z = 28;
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(1.0);
     container.appendChild(renderer.domElement);
 
     // 1. Particle System (Bio-luminescent spores / data nodes)
-    const particleCount = 450;
+    const particleCount = 200;
     const particleGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
@@ -81,38 +81,6 @@ export const ThreeHeroCanvas: React.FC<ThreeHeroCanvasProps> = ({ className = ''
     const particles = new THREE.Points(particleGeometry, particleMaterial);
     scene.add(particles);
 
-    // 2. Holographic Planetary Digital Twin Sphere (Subtle Wireframe)
-    const sphereGeometry = new THREE.IcosahedronGeometry(11, 2);
-    const wireframeMaterial = new THREE.MeshBasicMaterial({
-      color: 0x059669,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.18,
-    });
-    const globe = new THREE.Mesh(sphereGeometry, wireframeMaterial);
-    globe.position.set(12, -2, -5);
-    scene.add(globe);
-
-    // 3. Satellite Orbit Ring
-    const ringGeometry = new THREE.RingGeometry(15, 15.15, 64);
-    const ringMaterial = new THREE.MeshBasicMaterial({
-      color: 0x34d399,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.25,
-    });
-    const orbitRing = new THREE.Mesh(ringGeometry, ringMaterial);
-    orbitRing.rotation.x = Math.PI / 2.5;
-    orbitRing.rotation.y = Math.PI / 6;
-    orbitRing.position.set(12, -2, -5);
-    scene.add(orbitRing);
-
-    // 4. Satellite Beacon
-    const satGeo = new THREE.SphereGeometry(0.35, 16, 16);
-    const satMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const satellite = new THREE.Mesh(satGeo, satMat);
-    scene.add(satellite);
-
     // Mouse Tracking with smooth interpolation
     let mouseX = 0;
     let mouseY = 0;
@@ -129,13 +97,18 @@ export const ThreeHeroCanvas: React.FC<ThreeHeroCanvasProps> = ({ className = ''
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
 
     // Animation Loop with Dynamic FPS Monitoring & Quality Downscaling
-    let animationFrameId: number;
+    let animationFrameId = 0;
     let clock = new THREE.Clock();
     let frameCount = 0;
     let lastFpsCheckTime = performance.now();
     let isLowQualityMode = false;
+    let isVisible = true;
 
     const animate = () => {
+      if (!isVisible) {
+        animationFrameId = 0;
+        return;
+      }
       animationFrameId = requestAnimationFrame(animate);
       const elapsedTime = clock.getElapsedTime();
       const now = performance.now();
@@ -163,22 +136,25 @@ export const ThreeHeroCanvas: React.FC<ThreeHeroCanvasProps> = ({ className = ''
       camera.position.y = -mouseY * 8;
       camera.lookAt(scene.position);
 
-      // Rotate particles & globe
+      // Rotate particles
       particles.rotation.y = elapsedTime * 0.03;
       particles.rotation.x = elapsedTime * 0.015;
-
-      globe.rotation.y = elapsedTime * 0.08;
-      globe.rotation.x = elapsedTime * 0.04;
-
-      // Orbit satellite around globe
-      const orbitAngle = elapsedTime * 0.6;
-      satellite.position.x = globe.position.x + Math.cos(orbitAngle) * 15;
-      satellite.position.z = globe.position.z + Math.sin(orbitAngle) * 15 * Math.cos(Math.PI / 2.5);
-      satellite.position.y = globe.position.y + Math.sin(orbitAngle) * 15 * Math.sin(Math.PI / 2.5) * 0.5;
 
       renderer.render(scene, camera);
     };
 
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry.isIntersecting;
+        if (isVisible && animationFrameId === 0) {
+          animate();
+        }
+      },
+      { threshold: 0.01 }
+    );
+    observer.observe(container);
+
+    // Initial start
     animate();
 
     // Resize Handler
@@ -194,7 +170,8 @@ export const ThreeHeroCanvas: React.FC<ThreeHeroCanvasProps> = ({ className = ''
     window.addEventListener('resize', handleResize);
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      observer.disconnect();
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
       if (container && renderer.domElement) {
@@ -203,12 +180,6 @@ export const ThreeHeroCanvas: React.FC<ThreeHeroCanvasProps> = ({ className = ''
       renderer.dispose();
       particleGeometry.dispose();
       particleMaterial.dispose();
-      sphereGeometry.dispose();
-      wireframeMaterial.dispose();
-      ringGeometry.dispose();
-      ringMaterial.dispose();
-      satGeo.dispose();
-      satMat.dispose();
       texture.dispose();
     };
   }, []);

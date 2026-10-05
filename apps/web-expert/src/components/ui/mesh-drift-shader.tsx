@@ -421,13 +421,15 @@ export function ShaderBackground({ className }: { className?: string }) {
     const start = performance.now()
     const timeAnimated = Math.abs(UNIFORMS.timeScale) > 0.0001
 
+    let lastFrameTime = 0
+
     const resizeCanvas = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      const dpr = 1.0
       const rawWidth = Math.max(1, Math.round(bounds.width * dpr))
       const rawHeight = Math.max(1, Math.round(bounds.height * dpr))
       const pixelScale = Math.min(
-        1,
-        Math.sqrt(2_000_000 / Math.max(1, rawWidth * rawHeight)),
+        0.6,
+        Math.sqrt(400_000 / Math.max(1, rawWidth * rawHeight)),
       )
       const width = Math.max(1, Math.round(rawWidth * pixelScale))
       const height = Math.max(1, Math.round(rawHeight * pixelScale))
@@ -490,7 +492,6 @@ export function ShaderBackground({ className }: { className?: string }) {
     if (UNIFORMS.cursorEnabled) {
       window.addEventListener("pointermove", onPointerMove, { passive: true })
       window.addEventListener("pointercancel", onPointerLeave)
-      window.addEventListener("scroll", updateLayout, true)
       window.addEventListener("blur", onPointerLeave)
       document.documentElement.addEventListener("pointerleave", onPointerLeave)
     }
@@ -521,6 +522,11 @@ export function ShaderBackground({ className }: { className?: string }) {
     function render(now: number) {
       raf = 0
       if (disposed || !visible || !inView) return
+      if (now - lastFrameTime < 32) { // Cap ambient WebGL shader to 30 FPS to save 75% GPU cycles
+        requestRender()
+        return
+      }
+      lastFrameTime = now
       const dt = lastNow === null ? 0 : Math.min((now - lastNow) / 1000, 0.1)
       lastNow = now
       const follow = 1 - Math.exp(-12 * dt)
@@ -570,7 +576,6 @@ export function ShaderBackground({ className }: { className?: string }) {
       if (UNIFORMS.cursorEnabled) {
         window.removeEventListener("pointermove", onPointerMove)
         window.removeEventListener("pointercancel", onPointerLeave)
-        window.removeEventListener("scroll", updateLayout, true)
         window.removeEventListener("blur", onPointerLeave)
         document.documentElement.removeEventListener(
           "pointerleave",

@@ -71,6 +71,15 @@ export const FluidRippleShaderCanvas: React.FC<FluidRippleShaderCanvasProps> = (
     };
     window.addEventListener('resize', handleResize);
 
+    let isRendering = false;
+
+    const startLoop = () => {
+      if (!isRendering) {
+        isRendering = true;
+        animId = requestAnimationFrame(render);
+      }
+    };
+
     const render = (time: number) => {
       ctx.clearRect(0, 0, width, height);
 
@@ -92,7 +101,7 @@ export const FluidRippleShaderCanvas: React.FC<FluidRippleShaderCanvasProps> = (
 
         // Outer liquid wave ring
         ctx.beginPath();
-        const segments = 48;
+        const segments = 36;
         for (let s = 0; s <= segments; s++) {
           const angle = (s / segments) * Math.PI * 2;
           // Organic fluid wave wobble
@@ -121,30 +130,15 @@ export const FluidRippleShaderCanvas: React.FC<FluidRippleShaderCanvasProps> = (
           ctx.stroke();
         }
 
-        // Tertiary soft glow radial gradient
-        const grad = ctx.createRadialGradient(
-          rip.x,
-          rip.y,
-          Math.max(0, rip.radius * 0.2),
-          rip.x,
-          rip.y,
-          rip.radius
-        );
-        grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-        grad.addColorStop(0.7, rip.color.replace(')', ', 0.15)').replace('rgb', 'rgba'));
-        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-        ctx.fillStyle = grad;
-        ctx.globalAlpha = rip.alpha * 0.35;
-        ctx.fill();
-
         ctx.restore();
       }
 
-      animId = requestAnimationFrame(render);
+      if (activeRipplesRef.current.length > 0) {
+        animId = requestAnimationFrame(render);
+      } else {
+        isRendering = false;
+      }
     };
-
-    animId = requestAnimationFrame(render);
 
     return () => {
       cancelAnimationFrame(animId);

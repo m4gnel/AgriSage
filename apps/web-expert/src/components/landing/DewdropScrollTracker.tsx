@@ -61,7 +61,7 @@ const CHAPTER_METAS: ChapterMeta[] = [
  * Weaves across the X-axis through open corridors without overlapping text
  */
 const SPLINE_WAYPOINTS: SplinePoint[] = [
-  { x: 47.2, y: 26 }, // Ch 01: Hero (Leaf starting position above the 'i' in Agri-SAGE)
+  { x: 48.2, y: 24.5 }, // Ch 01: Hero (Leaf petiole tip sitting directly above 'ı' stem in Agri-SAGE)
   { x: 78, y: 28 },  // Ch 02: The Problem (Weaving right corridor)
   { x: 22, y: 36 },  // Ch 03: Farm 360 (Drifting left corridor)
   { x: 80, y: 44 },  // Ch 04: See The Invisible (Right corridor)
@@ -171,14 +171,14 @@ export const DewdropScrollTracker: React.FC<DewdropScrollTrackerProps> = ({
 
     // Cache hero and footer anchor positions on top/bottom scroll or resize (zero layout thrashing in RAF)
     const updateAnchorPos = () => {
-      // 1. Hero Title 'i' Anchor (Top starting position)
+      // 1. Hero Title 'i' Anchor (Petiole tip of glowing leaf sits directly above stem of letter 'i')
       const heroAnchor = document.getElementById('agri-i-anchor');
       if (heroAnchor) {
         const rect = heroAnchor.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
           cachedHeroAnchorPos = {
-            x: rect.left + rect.width / 2 + 25,
-            y: rect.top + rect.height * 0.22 - 32
+            x: rect.left + rect.width / 2 + 35.5,
+            y: rect.top - 4.0
           };
         }
       }
@@ -192,7 +192,7 @@ export const DewdropScrollTracker: React.FC<DewdropScrollTrackerProps> = ({
           const exactFooterIX = fRect.left + fRect.width * 0.415;
           const exactFooterIY = fRect.top + fRect.height * 0.20;
           cachedFooterAnchorPos = {
-            x: exactFooterIX + 12,
+            x: exactFooterIX + 30.9,
             y: exactFooterIY - 38
           };
         }
@@ -217,8 +217,8 @@ export const DewdropScrollTracker: React.FC<DewdropScrollTrackerProps> = ({
       smoothProgressRef.current = damp(smoothProgressRef.current, rawP, 24, dt);
       const p = smoothProgressRef.current;
 
-      // Update anchor cache near top or bottom of page periodically
-      if ((p < 0.1 || p > 0.9) && currentTime - lastAnchorCheck > 300) {
+      // Update anchor cache periodically (at most once every 1000ms) or if not yet cached
+      if (!cachedHeroAnchorPos || currentTime - lastAnchorCheck > 1000) {
         lastAnchorCheck = currentTime;
         updateAnchorPos();
       }
@@ -275,8 +275,8 @@ export const DewdropScrollTracker: React.FC<DewdropScrollTrackerProps> = ({
         angle: targetAngle
       };
 
-      // Initialize on first frame if at (0, 0)
-      if (posMain.current.x === 0 && posMain.current.y === 0) {
+      // Initialize on first frame or at rest at top of page (p < 0.001)
+      if ((posMain.current.x === 0 && posMain.current.y === 0) || p < 0.001) {
         posMain.current = { x: targetPixelX, y: targetPixelY, angle: targetAngle };
         posD1.current = { x: targetPixelX, y: targetPixelY };
         posD2.current = { x: targetPixelX, y: targetPixelY };
@@ -328,6 +328,7 @@ export const DewdropScrollTracker: React.FC<DewdropScrollTrackerProps> = ({
         const my = posMain.current.y + (isNaN(physics.wobbleY) ? 0 : physics.wobbleY);
         const combinedRotation = (posMain.current.angle || 0) + (physics.rotation || 0);
         mainDropRef.current.style.transform = `translate3d(${mx.toFixed(2)}px, ${my.toFixed(2)}px, 0px) rotate(${combinedRotation.toFixed(2)}deg) scale(${sX.toFixed(3)}, ${sY.toFixed(3)})`;
+        mainDropRef.current.style.opacity = '1';
       }
 
       if (daughter1Ref.current) {
@@ -357,6 +358,19 @@ export const DewdropScrollTracker: React.FC<DewdropScrollTrackerProps> = ({
     };
   }, []);
 
+  const [viewport, setViewport] = useState({
+    w: typeof window !== 'undefined' ? window.innerWidth : 1400,
+    h: typeof window !== 'undefined' ? window.innerHeight : 900
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Handle clicking on dewdrop for playful liquid burst
   const handleDewdropClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -366,17 +380,26 @@ export const DewdropScrollTracker: React.FC<DewdropScrollTrackerProps> = ({
     triggerRippleAt(posMain.current.x, posMain.current.y, currentMeta.color, 1.4);
   };
 
-  // Generate continuous SVG path string across all waypoints using Catmull-Rom spline sampling (No dots!)
+  // Generate continuous SVG path string across all waypoints using Catmull-Rom spline sampling (Pixel coordinates for W3C SVG spec compliance)
   const splinePathData = useMemo(() => {
     const samples = 140;
     const points: string[] = [];
+    const vw = viewport.w;
+    const vh = viewport.h;
+    const widthFactor = vw > 1200 ? 1.0 : vw > 768 ? 0.75 : 0.5;
+
     for (let s = 0; s <= samples; s++) {
       const p = s / samples;
       const res = evaluateSpline(SPLINE_WAYPOINTS, p);
-      points.push(`${res.x}% ${res.y}%`);
+      const mappedXPercent = 50 + (res.x - 50) * widthFactor;
+      const horizontalSway = Math.sin(p * Math.PI * 8) * 22;
+      const verticalWave = Math.sin(p * Math.PI * 12) * 35;
+      const px = (mappedXPercent / 100) * vw + horizontalSway;
+      const py = (res.y / 100) * vh + verticalWave;
+      points.push(`${px.toFixed(1)} ${py.toFixed(1)}`);
     }
     return `M ${points.join(' L ')}`;
-  }, []);
+  }, [viewport.w, viewport.h]);
 
   return (
     /* FIXED OVERLAY CONTAINER PINNED TO VIEWPORT AT BACKGROUND LAYER (z-[1]) */
@@ -467,23 +490,7 @@ export const DewdropScrollTracker: React.FC<DewdropScrollTrackerProps> = ({
           </radialGradient>
         </defs>
 
-        {/* Sinuous Capillary River Stream across the full canvas */}
-        <path
-          d={splinePathData}
-          fill="none"
-          stroke="url(#stream-gradient)"
-          strokeWidth="2.2"
-          className="opacity-40"
-          filter="url(#dewdrop-glow)"
-        />
-        <path
-          d={splinePathData}
-          fill="none"
-          stroke="rgba(255, 255, 255, 0.4)"
-          strokeWidth="1.2"
-          strokeDasharray="8 6"
-          className="opacity-50"
-        />
+        {/* Sinuous Capillary River Stream path lines removed as requested */}
 
         {/* TRAILING DAUGHTER BIO-PETAL SPORES (Chained LERP Viscosity Tail) */}
         <g ref={daughter4Ref} className="opacity-60" style={{ willChange: 'transform' }}>
@@ -604,49 +611,6 @@ export const DewdropScrollTracker: React.FC<DewdropScrollTrackerProps> = ({
           />
         </g>
       </svg>
-
-      {/* DOCKED SCROLLYTELLING TELEMETRY PILL (Bottom-Right, Never Overlaps Content) */}
-      <div
-        className="fixed bottom-6 right-6 z-50 pointer-events-auto flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-slate-950/90 backdrop-blur-xl border border-[var(--color-outline-variant)] shadow-2xl text-xs font-mono transition-all duration-300 hover:scale-105"
-        style={{ borderColor: currentMeta.color }}
-      >
-        {/* Biophilic Pulse Bead */}
-        <div className="flex items-center gap-2">
-          <span
-            className="w-2.5 h-2.5 rounded-full animate-ping"
-            style={{ backgroundColor: currentMeta.color }}
-          />
-          <span className="font-bold text-[11px] text-emerald-400">
-            CH {String(currentMeta.index).padStart(2, '0')}/12
-          </span>
-        </div>
-
-        <div className="h-4 w-px bg-slate-800" />
-
-        {/* Metric Readout */}
-        <div className="flex items-center gap-1.5 text-slate-200">
-          <Sprout size={13} style={{ color: currentMeta.color }} />
-          <span className="font-semibold truncate max-w-[140px] text-[11px]">
-            {lang === 'ml' ? currentMeta.nameMl : currentMeta.nameEn}
-          </span>
-        </div>
-
-        <div className="h-4 w-px bg-slate-800 hidden sm:block" />
-
-        {/* Velocity Badge */}
-        <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-slate-400">
-          <span>{velocityHUD} px/s</span>
-          <div className="w-12 bg-slate-800 rounded-full h-1 overflow-hidden">
-            <div
-              className="h-full transition-all duration-75"
-              style={{
-                width: `${Math.min(100, (velocityHUD / 800) * 100)}%`,
-                backgroundColor: currentMeta.color
-              }}
-            />
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

@@ -36,11 +36,14 @@ import {
   Microscope,
   Send,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  Scan
 } from 'lucide-react';
 import { ThreeHeroCanvas } from '../components/landing/ThreeHeroCanvas';
 import { GlassTiltCard } from '../components/landing/GlassTiltCard';
 import { playHoverChime, playSuccessTone, toggleAudioMute, getAudioMuteState } from '../utils/audioFX';
+import { getPublicUrl } from '../lib/utils';
 
 import { useScrollTriggerSnap } from '../hooks/useScrollTriggerSnap';
 import { useParallaxLayers } from '../hooks/useParallaxLayers';
@@ -103,11 +106,11 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   const scrollSeqContainerRef = useRef<HTMLDivElement>(null);
   const scrollSeqCanvasRef = useRef<HTMLCanvasElement>(null);
   const sproutFrameUrls = useMemo(() => [
-    '/images/seq_sprout_01.jpg',
-    '/images/seq_sprout_02.jpg',
-    '/images/seq_sprout_03.jpg',
-    '/images/seq_sprout_04.jpg',
-    '/images/seq_sprout_05.jpg'
+    getPublicUrl('/images/seq_sprout_01.jpg'),
+    getPublicUrl('/images/seq_sprout_02.jpg'),
+    getPublicUrl('/images/seq_sprout_03.jpg'),
+    getPublicUrl('/images/seq_sprout_04.jpg'),
+    getPublicUrl('/images/seq_sprout_05.jpg')
   ], []);
 
   useScrollSequence({
@@ -118,6 +121,56 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
   const [heroViewMode, setHeroViewMode] = useState<'orbit' | 'macro'>('macro');
   const [audioMuted, setAudioMuted] = useState(true);
+
+  // Master Chapter Directory Navigation Metadata
+  const CHAPTERS_NAV = useMemo(() => [
+    { id: 1, title: 'Hero & Mission', desc: 'Planetary to Cellular AI Guidance', icon: Sprout, color: '#10b981' },
+    { id: 2, title: 'Pathogen Genesis', desc: 'Invisible Early Infection Detection', icon: AlertTriangle, color: '#f59e0b' },
+    { id: 3, title: 'Farm 360', desc: 'Digital Twin & Multi-Sensor Fusion', icon: Layers, color: '#0ea5e9' },
+    { id: 4, title: 'Sub-Surface Stress', desc: 'Multi-Spectral Stomata Conductance', icon: Eye, color: '#06b6d4' },
+    { id: 5, title: 'Neural Core', desc: 'Biophysical INT8 AI Pipeline', icon: Cpu, color: '#8b5cf6' },
+    { id: 6, title: 'Multi-Agent Swarm', desc: 'Autonomous Agronomist Ensemble', icon: Radio, color: '#3b82f6' },
+    { id: 7, title: 'Crop Simulator', desc: '14-Day Predictive Growth Projection', icon: Sliders, color: '#22c55e' },
+    { id: 8, title: 'Risk Reduction', desc: 'Systematic Yield Protection 72% → 10%', icon: ShieldCheck, color: '#6366f1' },
+    { id: 9, title: 'Farmer Advisory', desc: 'Audio & WhatsApp Local Guidance', icon: Activity, color: '#eab308' },
+    { id: 10, title: 'Global Twin', desc: 'Planetary Farm Network Mesh', icon: Globe, color: '#0ea5e9' },
+    { id: 11, title: 'Workstation', desc: 'Quantum Executive Console', icon: BarChart3, color: '#10b981' },
+    { id: 12, title: 'Singularity Call', desc: 'Transforming Agriculture Today', icon: Zap, color: '#10b981' }
+  ], []);
+
+  // Frame 1 Interactive Elevation & Chapter Drawer States
+  const [isChapterDrawerOpen, setIsChapterDrawerOpen] = useState(false);
+  const [isThermalScanActive, setIsThermalScanActive] = useState(false);
+  const [activeHudMetric, setActiveHudMetric] = useState<'temp' | 'moisture' | 'humidity' | 'disease'>('temp');
+  const [heroSearchQuery, setHeroSearchQuery] = useState('');
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simResult, setSimResult] = useState<{ title: string; subtitle: string; score: string } | null>(null);
+
+  // Zero-lag CSS-variable mouse spotlight (NO React re-renders)
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      document.documentElement.style.setProperty('--mouse-x', `${e.clientX}px`);
+      document.documentElement.style.setProperty('--mouse-y', `${e.clientY}px`);
+    };
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  const handleHeroSimulate = (query: string) => {
+    playHoverChime(700);
+    setIsSimulating(true);
+    setSimResult(null);
+    setTimeout(() => {
+      playSuccessTone();
+      setIsSimulating(false);
+      const cropName = query.trim() ? query.trim() : 'Palakkad Paddy Hectare #04';
+      setSimResult({
+        title: `AI Diagnostic: ${cropName}`,
+        subtitle: 'Canopy Transpiration Optimal · Spore Genesis Risk: <3.2% · INT8 Biophysical Model Checked',
+        score: '98.6% Health Score'
+      });
+    }, 1100);
+  };
   
   // Chapter 02: Problem Split View Slider
   const [splitSliderPos, setSplitSliderPos] = useState(50);
@@ -164,11 +217,12 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
     try {
       lenisInstance = new Lenis({
-        duration: 1.1,
-        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        lerp: 0.08,
         smoothWheel: true,
+        wheelMultiplier: 1.0,
         touchMultiplier: 1.5,
         infinite: false,
+        autoResize: true,
       });
 
       lenisInstance.on('scroll', ScrollTrigger.update);
@@ -261,62 +315,40 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
       </div>
 
       {/* Main Glassmorphic Navigation Header */}
-      <header className="h-20 glass-panel sticky top-0 z-50 px-4 md:px-10 flex items-center justify-between border-b rounded-none border-[var(--color-surface-glass-border)] shadow-md">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 border border-emerald-300/40 hologram-float">
-            <Sprout size={26} />
+      <header className="sticky top-0 z-50 h-16 px-4 md:px-10 flex items-center justify-between bg-slate-950/85 backdrop-blur-xl border-b border-white/10 text-white shadow-xl transition-all duration-300">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 border border-emerald-300/40 hologram-float">
+            <Sprout size={24} />
           </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="text-xl font-black tracking-tight text-[var(--color-on-surface)]">
+            <div>
+              <span className="text-lg font-black tracking-tight text-white">
                 Agri-SAGE
               </span>
-              <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-widest">
-                3D Scrollytelling
-              </span>
+              <p className="text-[11px] text-slate-400 hidden sm:block font-medium">
+                From a single seed to a smarter tomorrow.
+              </p>
             </div>
-            <p className="text-[11px] text-[var(--color-on-surface-secondary)] hidden sm:block font-medium">
-              From a single seed to a smarter tomorrow.
-            </p>
-          </div>
         </div>
 
         {/* Header Right Actions */}
-        <div className="flex items-center gap-2.5 sm:gap-3.5">
-          {/* Audio Synthesizer Toggle */}
-          <button
-            type="button"
-            onClick={handleAudioToggle}
-            className={`p-2.5 rounded-xl border text-xs transition-all shadow-xs flex items-center gap-1.5 ${
-              !audioMuted
-                ? 'bg-emerald-500/15 border-emerald-500 text-emerald-600 dark:text-emerald-400 shadow-emerald-500/20'
-                : 'border-[var(--color-outline)] text-[var(--color-on-surface-secondary)] hover:border-emerald-500 bg-[var(--color-surface)]'
-            }`}
-            title={audioMuted ? 'Turn on Interface Sound FX' : 'Mute Interface Sound FX'}
-          >
-            {audioMuted ? <VolumeX size={16} /> : <Volume2 size={16} className="text-emerald-500 animate-pulse" />}
-            <span className="text-[10px] font-mono hidden md:inline font-bold uppercase tracking-wider">
-              {audioMuted ? 'Audio Off' : 'Sound FX'}
-            </span>
-          </button>
-
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Theme Mode */}
           <button
             type="button"
             onClick={onToggleTheme}
-            className="p-2.5 rounded-xl border border-[var(--color-outline)] hover:border-[var(--color-primary)] text-[var(--color-on-surface)] bg-[var(--color-surface)] transition-all shadow-xs"
+            className="p-2 rounded-xl border border-white/10 hover:border-emerald-400 text-slate-200 bg-white/5 transition-all shadow-xs"
             title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
           >
-            {theme === 'dark' ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-slate-700" />}
+            {theme === 'dark' ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} className="text-slate-300" />}
           </button>
 
           {/* Language Switch */}
           <button
             type="button"
             onClick={onToggleLang}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--color-outline)] hover:border-[var(--color-primary)] text-xs font-bold text-[var(--color-on-surface)] bg-[var(--color-surface)] transition-all shadow-xs"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-white/10 hover:border-emerald-400 text-xs font-bold text-slate-200 bg-white/5 transition-all shadow-xs"
           >
-            <Globe size={14} className="text-[var(--color-primary)]" />
+            <Globe size={14} className="text-emerald-400" />
             <span>{lang === 'ml' ? 'മലയാളം' : 'English'}</span>
           </button>
 
@@ -324,9 +356,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           <button
             type="button"
             onClick={onEnterAuth}
-            className="btn btn-outline text-xs h-10 px-4 flex items-center gap-1.5 font-bold"
+            className="btn border border-white/20 hover:border-emerald-400 text-white text-xs h-9 px-3.5 flex items-center gap-1.5 font-bold bg-white/5"
           >
-            <Lock size={14} />
+            <Lock size={13} />
             <span>{lang === 'ml' ? 'പ്രവേശിക്കുക' : 'Sign In'}</span>
           </button>
 
@@ -334,13 +366,97 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           <button
             type="button"
             onClick={onDirectPlatformAccess}
-            className="btn btn-primary text-xs h-10 px-4 hidden sm:flex items-center gap-1.5 font-bold shadow-lg shadow-emerald-500/25"
+            className="btn btn-primary text-xs h-9 px-4 hidden sm:flex items-center gap-1.5 font-bold shadow-lg shadow-emerald-500/25"
           >
             <span>{lang === 'ml' ? 'പ്ലാറ്റ്‌ഫോം തുറക്കുക' : 'Enter Platform'}</span>
             <ArrowRight size={14} />
           </button>
         </div>
       </header>
+
+      {/* FLOATING QUICK CHAPTER DOCK (Fixed Bottom-Left for 1-Click Navigation Across Entire Webpage) */}
+      <div className="fixed bottom-6 left-6 z-40 pointer-events-auto">
+        <button
+          type="button"
+          onClick={() => {
+            playHoverChime(600);
+            setIsChapterDrawerOpen(!isChapterDrawerOpen);
+          }}
+          className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-950/90 backdrop-blur-xl border border-emerald-500/40 shadow-2xl text-xs font-mono text-white transition-all hover:scale-105 hover:border-emerald-400"
+        >
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="font-bold text-emerald-400">CH {String(activeChapter).padStart(2, '0')}</span>
+          <span className="text-slate-300 truncate max-w-[130px] sm:max-w-[190px]">
+            {CHAPTERS_NAV.find(c => c.id === activeChapter)?.title || 'Hero'}
+          </span>
+          <ChevronDown size={14} className={`text-slate-400 transition-transform duration-300 ${isChapterDrawerOpen ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {/* INTERACTIVE CHAPTER JUMP DIRECTORY OVERLAY MODAL */}
+      {isChapterDrawerOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-2xl animate-in fade-in duration-300">
+          <div className="bg-slate-950 border border-emerald-500/40 rounded-3xl p-6 max-w-4xl w-full max-h-[85vh] overflow-y-auto shadow-2xl space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center">
+                  <Layers size={22} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white tracking-tight">12 Chapter Interactive Directory</h3>
+                  <p className="text-xs text-slate-400 font-mono">Jump instantly across the scrollytelling timeline with 1 click</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChapterDrawerOpen(false)}
+                className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-mono font-bold transition-all"
+              >
+                Close ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {CHAPTERS_NAV.map((ch) => {
+                const Icon = ch.icon;
+                const isActive = activeChapter === ch.id;
+                return (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => {
+                      playSuccessTone();
+                      scrollToChapter(ch.id);
+                      setIsChapterDrawerOpen(false);
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all group flex flex-col justify-between space-y-3 ${
+                      isActive
+                        ? 'bg-emerald-950/90 border-emerald-400 shadow-xl shadow-emerald-500/20 ring-1 ring-emerald-400/50'
+                        : 'bg-slate-900/60 border-white/10 hover:border-emerald-500/50 hover:bg-slate-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-full bg-white/10 text-white group-hover:bg-emerald-500 group-hover:text-black transition-colors">
+                        CH {String(ch.id).padStart(2, '0')}
+                      </span>
+                      <Icon size={18} style={{ color: ch.color }} />
+                    </div>
+
+                    <div>
+                      <strong className="block text-sm font-bold text-white group-hover:text-emerald-300 transition-colors">
+                        {ch.title}
+                      </strong>
+                      <span className="text-[11px] text-slate-400 font-mono block mt-1 leading-tight">
+                        {ch.desc}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =========================================================================
           CHAPTER 01: HERO SECTION ("Every Field Has a Story")
@@ -400,37 +516,23 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           className="parallax-decoration parallax-orb parallax-orb-purple parallax-glow-pulse-slow w-[100px] h-[100px] top-[60%] right-[8%] opacity-30 hidden xl:block"
         />
 
-        {/* Particle Ring Image – deep background layer */}
+        {/* Hardware-Accelerated Interactive Mouse Light-Beam Aura (Zero-lag RAF Cursor Spotlight) */}
         <div
-          data-parallax-speed="0.4"
-          data-parallax-rotate="6"
-          className="parallax-decoration w-[400px] h-[400px] top-[10%] left-[50%] -translate-x-1/2 opacity-20 hidden lg:block"
-        >
-          <img src="/images/parallax_ring.jpg" alt="" className="w-full h-full object-contain mix-blend-screen" aria-hidden="true" />
-        </div>
+          className="pointer-events-none absolute inset-0 z-10 opacity-40 transition-opacity duration-500 hidden md:block"
+          style={{
+            background: 'radial-gradient(650px circle at var(--mouse-x, 50vw) var(--mouse-y, 40vh), rgba(16, 185, 129, 0.16), rgba(6, 182, 212, 0.08), transparent 70%)'
+          }}
+        />
 
         {/* 21st.dev Osmo Multi-Layer GSAP Parallax Layer Container */}
         <div data-parallax-layers className="hero-zoom-target absolute inset-0 z-0 pointer-events-none overflow-hidden">
-          {/* Layer 1: Deep Background Image (yPercent: 70) */}
+          {/* Layer 1: Deep Sprout Macro Background Image (yPercent: 70) */}
           <div data-parallax-layer="1" className="absolute inset-0 w-full h-full">
-            {heroViewMode === 'macro' ? (
-              <img
-                src="/images/hero_sprout_macro.jpg"
-                alt="Close-up bio-luminescent sprout with glowing cellular veins"
-                className="w-full h-full object-cover object-center filter brightness-[0.88] contrast-105"
-              />
-            ) : (
-              <img
-                src="/images/hero_earth.jpg"
-                alt="Cinematic Space to Earth Farmland Transition"
-                className="w-full h-full object-cover object-center filter brightness-[0.85] contrast-105"
-              />
-            )}
-          </div>
-
-          {/* Layer 2: Midground Particle Mesh Overlay (yPercent: 55) */}
-          <div data-parallax-layer="2" className="absolute inset-0 w-full h-full opacity-60 mix-blend-screen pointer-events-none">
-            <img src="/images/parallax_ring.jpg" alt="" className="w-full h-full object-cover" />
+            <img
+              src={getPublicUrl('/images/hero_sprout_macro.jpg')}
+              alt="Close-up bio-luminescent sprout with glowing cellular veins"
+              className="w-full h-full object-cover object-center filter brightness-[0.88] contrast-105 transition-all duration-700"
+            />
           </div>
 
           {/* Layer 3: Interactive Constellation & Gradients (yPercent: 40) */}
@@ -446,143 +548,84 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         {/* Three.js Interactive Particle Constellation & Planetary Canvas */}
         <ThreeHeroCanvas className="z-10" />
 
-        {/* Viewport Mode Switcher Pill (Space to Earth vs. Micro Sprout) */}
-        <div className="absolute top-24 left-6 md:left-12 z-20 flex items-center p-1 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 text-xs font-mono shadow-xl">
-          <button
-            type="button"
-            onClick={() => {
-              playHoverChime(500);
-              setHeroViewMode('macro');
-            }}
-            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-bold uppercase tracking-wider text-[11px] ${
-              heroViewMode === 'macro'
-                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
-                : 'text-white/70 hover:text-white'
-            }`}
-          >
-            <Microscope size={13} />
-            <span>3D Sprout Macro</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              playHoverChime(650);
-              setHeroViewMode('orbit');
-            }}
-            className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 font-bold uppercase tracking-wider text-[11px] ${
-              heroViewMode === 'orbit'
-                ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/30'
-                : 'text-white/70 hover:text-white'
-            }`}
-          >
-            <Compass size={13} />
-            <span>Orbital Farmland</span>
-          </button>
-        </div>
-
-        {/* Top-Right: 3D HERO SECTION (Close-up View HUD Telemetry) */}
-        <div className="absolute top-24 right-4 md:right-12 z-20 hidden md:flex flex-col gap-3 max-w-[280px]">
-          <div
-            data-parallax-speed="1.35"
-            data-parallax-z="80"
-            data-parallax-rotate-y="-10"
-          >
-            <GlassTiltCard translateZ={30} className="p-3.5 bg-slate-900/80 border-emerald-500/30 text-white">
-              <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
-                <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Live Bio-Telemetry HUD
-                </span>
-                <span className="text-[10px] font-mono text-white/50">Ch 01</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="p-2 rounded-xl bg-white/5 border border-white/10">
-                  <div className="flex items-center gap-1 text-[10px] text-amber-300 font-mono">
-                    <Thermometer size={12} /> Temp
-                  </div>
-                  <div className="text-sm font-black font-mono mt-0.5">29.4°C</div>
-                </div>
-
-                <div className="p-2 rounded-xl bg-white/5 border border-white/10">
-                  <div className="flex items-center gap-1 text-[10px] text-blue-300 font-mono">
-                    <Droplets size={12} /> Moisture
-                  </div>
-                  <div className="text-sm font-black font-mono mt-0.5">64%</div>
-                </div>
-
-                <div className="p-2 rounded-xl bg-white/5 border border-white/10">
-                  <div className="flex items-center gap-1 text-[10px] text-teal-300 font-mono">
-                    <CloudRain size={12} /> Humidity
-                  </div>
-                  <div className="text-sm font-black font-mono mt-0.5">78%</div>
-                </div>
-
-                <div className="p-2 rounded-xl bg-white/5 border border-white/10">
-                  <div className="flex items-center gap-1 text-[10px] text-emerald-300 font-mono">
-                    <ShieldCheck size={12} /> Disease
-                  </div>
-                  <div className="text-sm font-black font-mono text-emerald-400 mt-0.5 uppercase">Low</div>
-                </div>
-              </div>
-
-              <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-white/70 font-mono">
-                <span>Vitality: <strong className="text-emerald-300">98%</strong></span>
-                <span>Growth: <strong className="text-cyan-300">1.4 mm/h</strong></span>
-              </div>
-            </GlassTiltCard>
-          </div>
-
-          {/* Floating Holographic 3D Tile Widget (Blueprint: "3D + UI COMBINATION") */}
-          <div
-            data-parallax-speed="1.5"
-            data-parallax-z="120"
-            data-parallax-rotate-y="12"
-          >
-            <GlassTiltCard translateZ={50} className="p-3 bg-black/70 border-white/15 text-white hidden xl:block hologram-float-delayed">
-              <div className="text-[10px] font-mono text-cyan-400 font-bold uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>3D Field Mesh Tile</span>
-                <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-[9px]">L2A ACTIVE</span>
-              </div>
-              <div className="flex items-center gap-2.5 text-xs">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400">
-                  <Sprout size={16} />
-                </div>
-                <div>
-                  <strong className="block text-xs font-bold">Palakkad Hectare #04</strong>
-                  <span className="text-[10px] text-white/60 font-mono">Soil VWC: 64% · Canopy Good</span>
-                </div>
-              </div>
-            </GlassTiltCard>
-          </div>
-        </div>
-
         {/* Hero Narrative Content */}
-        <div className="relative z-20 max-w-4xl mx-auto text-center space-y-6 pt-10">
-          <h1 className="st-layer-2 velocity-reactive text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white drop-shadow-2xl leading-[1.1] flex flex-col items-center">
-            <span className="block font-black tracking-tight">
+        <div className="relative z-20 max-w-4xl mx-auto text-center space-y-6 pt-4 pb-6 px-4">
+
+          <h1 className="st-layer-2 velocity-reactive text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white drop-shadow-2xl leading-[1.15] flex flex-col items-center">
+            <span className="inline-block pb-3 px-1 bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent font-black tracking-tight group cursor-default overflow-visible">
               Agr<span id="agri-i-anchor" className="inline-block relative">ı</span>-SAGE
             </span>
-            <span className="block text-2xl sm:text-4xl md:text-5xl font-extrabold text-shimmer mt-4">
+            <span className="block text-2xl sm:text-4xl md:text-5xl font-extrabold text-white/95 mt-1 drop-shadow-lg">
               Intelligence for Every Field.
             </span>
           </h1>
 
-          <p className="st-layer-2 text-base sm:text-xl text-white/90 max-w-2xl mx-auto font-medium drop-shadow-md leading-relaxed">
+          <p className="st-layer-2 text-base sm:text-lg text-slate-300 max-w-2xl mx-auto font-normal leading-relaxed drop-shadow-md">
             AI-powered precision agriculture spanning planetary satellite observation to single-stomata cellular action. Grounded in biophysical simulation and offline-first edge compute.
           </p>
 
-          <div className="st-layer-3 flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+          {/* Quick AI Field Simulator Interactive Search Bar */}
+          <div className="pt-2 max-w-xl mx-auto w-full">
+            <div className="p-1.5 rounded-2xl bg-slate-900/90 backdrop-blur-2xl border border-white/20 flex flex-col sm:flex-row items-center gap-2 shadow-2xl transition-all focus-within:border-emerald-400">
+              <div className="flex-1 flex items-center gap-2.5 px-3 py-1.5 text-xs text-slate-300 font-mono w-full">
+                <Search size={15} className="text-emerald-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Enter farm location or crop (e.g. Palakkad Paddy, Vidarbha Cotton)"
+                  value={heroSearchQuery}
+                  onChange={(e) => setHeroSearchQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleHeroSimulate(heroSearchQuery); }}
+                  className="bg-transparent border-none outline-none text-white text-xs placeholder:text-slate-500 w-full"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleHeroSimulate(heroSearchQuery)}
+                disabled={isSimulating}
+                className="btn btn-primary text-xs py-2.5 px-5 font-bold flex items-center gap-2 shrink-0 w-full sm:w-auto justify-center shadow-lg shadow-emerald-500/25"
+              >
+                {isSimulating ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Simulating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    <span>Simulate Field</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Instant AI Simulation Diagnostic Result Card */}
+            {simResult && (
+              <div className="mt-3 p-3 rounded-2xl bg-emerald-950/90 border border-emerald-500/40 backdrop-blur-xl text-left text-white animate-in fade-in slide-in-from-top-2 duration-300 shadow-2xl flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <strong className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-400" />
+                    {simResult.title}
+                  </strong>
+                  <p className="text-[11px] text-slate-300 font-mono leading-tight">{simResult.subtitle}</p>
+                </div>
+                <span className="text-[10px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded border border-emerald-400/30 shrink-0">
+                  {simResult.score}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="st-layer-3 flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2 max-w-md mx-auto">
             <button
               type="button"
               onClick={() => {
                 playSuccessTone();
                 onEnterAuth();
               }}
-              className="btn btn-primary text-sm h-14 px-8 font-bold flex items-center gap-2.5 shadow-2xl shadow-emerald-500/40 w-full sm:w-auto hover:scale-105 transition-transform"
+              className="btn btn-primary text-sm h-12 px-7 font-bold flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 w-full sm:w-auto hover:scale-105 transition-transform"
             >
               <span>Get Started with Agri-SAGE</span>
-              <ArrowRight size={18} />
+              <ArrowRight size={16} />
             </button>
 
             <button
@@ -591,23 +634,39 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 playHoverChime(600);
                 onDirectPlatformAccess();
               }}
-              className="btn bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl border border-white/25 text-sm h-14 px-7 font-bold flex items-center gap-2 w-full sm:w-auto hover:border-emerald-400 transition-all"
+              className="btn bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl border border-white/20 text-sm h-12 px-6 font-bold flex items-center justify-center gap-2 w-full sm:w-auto hover:border-emerald-400 transition-all"
             >
               <Zap size={16} className="text-amber-400" />
-              <span>Launch Live Workstation (Frame 3)</span>
+              <span>Launch Live Workstation</span>
             </button>
           </div>
 
-          {/* Scroll to Explore Mouse Interaction (Blueprint: SCROLL INTERACTION) */}
+          {/* Live System Telemetry Trust Badge Strip */}
+          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] font-mono pt-2">
+            <span className="flex items-center gap-1.5 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/25 text-emerald-300 backdrop-blur-md">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              1,240+ Active Farm Clusters
+            </span>
+            <span className="flex items-center gap-1.5 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/25 text-cyan-300 backdrop-blur-md">
+              <ShieldCheck size={13} />
+              99.4% Detection Accuracy
+            </span>
+            <span className="flex items-center gap-1.5 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/25 text-purple-300 backdrop-blur-md">
+              <Cpu size={13} />
+              Offline Edge INT8 Ready
+            </span>
+          </div>
+
+          {/* Scroll to Explore Mouse Interaction */}
           <div
             onClick={() => scrollToChapter(2)}
-            className="pt-10 flex flex-col items-center gap-2 cursor-pointer text-white/70 hover:text-white transition-colors group"
+            className="pt-4 flex flex-col items-center gap-1.5 cursor-pointer text-white/60 hover:text-white transition-colors group"
           >
-            <span className="text-[11px] uppercase font-mono tracking-widest font-semibold group-hover:text-emerald-400 transition-colors">
+            <span className="text-[10px] uppercase font-mono tracking-widest font-semibold group-hover:text-emerald-400 transition-colors">
               Scroll to Explore the 12 Chapters
             </span>
-            <div className="w-6 h-10 rounded-full border-2 border-white/40 group-hover:border-emerald-400 flex items-start justify-center p-1.5 transition-colors">
-              <span className="w-1.5 h-2.5 rounded-full bg-emerald-400 animate-bounce" />
+            <div className="w-5 h-8 rounded-full border border-white/30 group-hover:border-emerald-400 flex items-start justify-center p-1 transition-colors">
+              <span className="w-1 h-2 rounded-full bg-emerald-400 animate-bounce" />
             </div>
           </div>
         </div>
@@ -680,7 +739,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               }}
             >
               <img
-                src="/images/crop_split.jpg"
+                src={getPublicUrl('/images/crop_split.jpg')}
                 alt="Thermal Spore Stress Detection"
                 className="w-full h-full object-cover filter saturate-150 contrast-125"
               />
@@ -747,7 +806,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           >
             <div style={{ width: splitContainerRef.current ? `${splitContainerRef.current.clientWidth}px` : '100vw', height: '100%' }}>
               <img
-                src="/images/crop_split.jpg"
+                src={getPublicUrl('/images/crop_split.jpg')}
                 alt="Daylight Natural Foliage"
                 className="w-full h-full object-cover filter brightness-105 contrast-95"
               />
@@ -928,7 +987,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         {/* 3D Isometric Connected Smart Farm Render */}
         <div className="relative z-10 rounded-3xl overflow-hidden border border-[var(--color-outline-variant)] shadow-2xl bg-black">
           <img
-            src="/images/farm_isometric.jpg"
+            src={getPublicUrl('/images/farm_isometric.jpg')}
             alt="3D Isometric Connected Smart Farm with Floating Glass HUDs"
             className="w-full h-[480px] md:h-[640px] object-cover"
           />
@@ -1015,7 +1074,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         {/* Microscope Cellular Inspection Display */}
         <div className="relative z-10 rounded-3xl overflow-hidden border border-cyan-500/30 shadow-2xl bg-black">
           <img
-            src="/images/cellular_macro.jpg"
+            src={getPublicUrl('/images/cellular_macro.jpg')}
             alt="Microscopic Cellular Chloroplast and Stomata Structure"
             className="w-full h-[500px] md:h-[620px] object-cover filter contrast-110"
           />
@@ -1647,7 +1706,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           {/* Farmer with Tablet Image Visualizer */}
           <div className="lg:col-span-6 relative rounded-3xl overflow-hidden border border-[var(--color-outline-variant)] shadow-2xl bg-black group">
             <img
-              src="/images/farmer_tablet.jpg"
+              src={getPublicUrl('/images/farmer_tablet.jpg')}
               alt="Farmer in Kerala paddy field inspecting advisory on digital tablet"
               className="w-full h-[460px] md:h-[560px] object-cover filter contrast-105"
             />
@@ -1721,7 +1780,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         {/* Global Network Image Display with Glass Metrics */}
         <div className="relative rounded-3xl overflow-hidden border border-[var(--color-outline-variant)] shadow-2xl bg-black">
           <img
-            src="/images/network_globe.jpg"
+            src={getPublicUrl('/images/network_globe.jpg')}
             alt="Global Connected Farm Network Digital Twin"
             className="w-full h-[460px] md:h-[620px] object-cover filter contrast-105"
           />

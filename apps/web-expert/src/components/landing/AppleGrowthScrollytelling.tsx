@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sprout, Cpu, Zap, ArrowRight, Activity, Layers } from 'lucide-react';
+import { Sprout } from 'lucide-react';
+import { getPublicUrl } from '@/lib/utils';
 
 interface AppleGrowthScrollytellingProps {
   onEnterPlatform?: () => void;
@@ -26,7 +27,7 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
   const frameUrls = useMemo(() => {
     return Array.from({ length: totalFrames }, (_, i) => {
       const num = String(i + 1).padStart(4, '0');
-      return `/images/Agri-Sage-Section-2-animation/${num}.jpg`;
+      return getPublicUrl(`/images/Agri-Sage-Section-2-animation/${num}.jpg`);
     });
   }, [totalFrames]);
 
@@ -100,8 +101,6 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
     const imgs = imgsList || imagesRef.current;
     const img = imgs[frameIdx];
 
-    updateCanvasDimensions();
-
     // Clear with strict #050505 color for perfect void blending
     ctx.fillStyle = '#050505';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -123,20 +122,27 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
     }
 
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  }, [updateCanvasDimensions]);
+  }, []);
 
-  // Smooth spring-dampened frame interpolation loop
+  // Smooth spring-dampened frame interpolation loop optimized for 144Hz high refresh rate
   useEffect(() => {
-    let animId: number;
+    let animId = 0;
+    let isVisible = true;
 
     const lerpFrameLoop = () => {
+      if (!isVisible) {
+        animId = 0;
+        return;
+      }
       const target = targetFrameRef.current;
       const current = animatedFrameRef.current;
 
-      // Smooth dampening factor (~0.22 for responsive yet buttery frame transitions)
       const diff = target - current;
       if (Math.abs(diff) > 0.01) {
-        animatedFrameRef.current = current + diff * 0.22;
+        const absDiff = Math.abs(diff);
+        // Adaptive lerp factor: scales dynamically so fast scroll flings track target frame with ZERO lag
+        const lerpFactor = absDiff > 20 ? 0.65 : absDiff > 6 ? 0.40 : 0.25;
+        animatedFrameRef.current = current + diff * lerpFactor;
         const roundedIdx = Math.min(totalFrames - 1, Math.max(0, Math.round(animatedFrameRef.current)));
         if (roundedIdx !== lastDrawnFrameRef.current) {
           lastDrawnFrameRef.current = roundedIdx;
@@ -147,41 +153,70 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
       animId = requestAnimationFrame(lerpFrameLoop);
     };
 
+    const container = containerRef.current;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry.isIntersecting;
+        if (isVisible && animId === 0) {
+          lerpFrameLoop();
+        }
+      },
+      { threshold: 0.01 }
+    );
+
+    if (container) {
+      observer.observe(container);
+    }
+
     animId = requestAnimationFrame(lerpFrameLoop);
 
+    let scrollRafId: number | null = null;
     const handleScroll = () => {
-      const container = containerRef.current;
-      if (!container) return;
+      if (!isVisible) return;
+      if (scrollRafId !== null) return;
 
-      const rect = container.getBoundingClientRect();
-      const vh = window.innerHeight;
-      const totalScrollable = rect.height - vh;
+      scrollRafId = requestAnimationFrame(() => {
+        scrollRafId = null;
+        if (!container) return;
 
-      if (totalScrollable <= 0) return;
+        const rect = container.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const totalScrollable = rect.height - vh;
 
-      const currentScroll = -rect.top;
-      const progress = Math.min(Math.max(currentScroll / totalScrollable, 0), 1);
-      
-      // Quantize setScrollP updates to prevent micro React re-renders on sub-pixel scroll movements
-      if (Math.abs(progress - lastScrollPRef.current) > 0.002) {
-        lastScrollPRef.current = progress;
-        setScrollP(progress);
-      }
+        if (totalScrollable <= 0) return;
 
-      const frameIdx = Math.min(totalFrames - 1, Math.floor(progress * totalFrames));
-      targetFrameRef.current = frameIdx;
+        const currentScroll = -rect.top;
+        const progress = Math.min(Math.max(currentScroll / totalScrollable, 0), 1);
+        
+        // Quantize setScrollP updates to prevent micro React re-renders on sub-pixel scroll movements
+        if (Math.abs(progress - lastScrollPRef.current) > 0.002) {
+          lastScrollPRef.current = progress;
+          setScrollP(progress);
+        }
+
+        const frameIdx = Math.min(totalFrames - 1, Math.floor(progress * totalFrames));
+        targetFrameRef.current = frameIdx;
+      });
+    };
+
+    updateCanvasDimensions();
+    const handleResize = () => {
+      updateCanvasDimensions();
+      handleScroll();
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleScroll);
+    window.addEventListener('resize', handleResize, { passive: true });
     handleScroll();
 
     return () => {
-      cancelAnimationFrame(animId);
+      observer.disconnect();
+      if (animId) cancelAnimationFrame(animId);
+      if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
       window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleScroll);
+      window.removeEventListener('resize', handleResize);
     };
-  }, [totalFrames, drawCanvasFrame]);
+  }, [totalFrames, drawCanvasFrame, updateCanvasDimensions]);
 
   // Determine active story beat based on scroll percentage
   const activeBeat = useMemo(() => {
@@ -192,14 +227,7 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
     return 5;
   }, [scrollP]);
 
-  // Stage name helper
-  const stageName = useMemo(() => {
-    if (currentFrame < 80) return 'Stage I · Embryonic Awakening';
-    if (currentFrame < 180) return 'Stage II · Cotyledon Emergence';
-    if (currentFrame < 290) return 'Stage III · Foliar Expansion';
-    if (currentFrame < 380) return 'Stage IV · Vegetative Vigor';
-    return 'Stage V · Full Canopy Saturation';
-  }, [currentFrame]);
+
 
   return (
     <div
@@ -249,18 +277,7 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
           />
         </div>
 
-        {/* Top HUD Telemetry Badge */}
-        <div className="relative z-30 w-full px-6 pt-6 flex items-center justify-between pointer-events-none">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/15 text-emerald-400 text-xs font-mono font-bold tracking-widest uppercase shadow-xl">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>{stageName}</span>
-          </div>
 
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/15 text-white/80 text-xs font-mono font-bold tracking-widest shadow-xl">
-            <span className="text-emerald-400">FRAME</span>
-            <span>{String(currentFrame + 1).padStart(3, '0')} / {totalFrames}</span>
-          </div>
-        </div>
 
         {/* Dynamic Scrollytelling Beats */}
         <div className="relative z-30 w-full max-w-7xl mx-auto px-6 md:px-12 flex-1 flex items-center pointer-events-none">
@@ -273,21 +290,16 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full max-w-4xl mx-auto text-center space-y-6"
+                className="w-full max-w-6xl mx-auto text-center space-y-6"
               >
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold uppercase tracking-widest">
-                  <Sprout size={13} />
-                  <span>Biophysical Transformation Engine</span>
-                </div>
-                <h2 className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black tracking-tighter text-white drop-shadow-2xl leading-[0.95]">
-                  EMERGENCE. <br />
-                  <span className="bg-gradient-to-r from-white via-emerald-300 to-teal-400 bg-clip-text text-transparent">
-                    PERFECTED.
+
+                <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter text-white drop-shadow-2xl leading-[1.05] uppercase">
+                  <span className="inline-block whitespace-nowrap">FROM A SINGLE SEED</span> <br />
+                  <span className="inline-block whitespace-nowrap bg-gradient-to-r from-white via-emerald-300 to-teal-400 bg-clip-text text-transparent">
+                    TO A SMARTER TOMORROW.
                   </span>
                 </h2>
-                <p className="text-base sm:text-xl text-white/70 max-w-2xl mx-auto font-medium leading-relaxed">
-                  Scroll to scrub through 441 hyper-photorealistic frames. Watch cellular plant phenology expand from embryonic seed awakening to full biophysical canopy saturation.
-                </p>
+
               </motion.div>
             )}
 
@@ -299,22 +311,14 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full max-w-xl text-left space-y-5 p-8 sm:p-10 rounded-3xl bg-black/75 backdrop-blur-2xl border border-white/15 shadow-2xl"
+                className="w-full max-w-xl text-left space-y-4"
               >
-                <div className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                  <Cpu size={14} />
-                  <span>Phenological Architecture</span>
-                </div>
-                <h3 className="text-3xl sm:text-5xl font-black text-white leading-tight tracking-tight">
+                <h3 className="text-3xl sm:text-5xl font-black text-white leading-tight tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
                   Precision-Engineered <br /> for Cellular Vitality.
                 </h3>
-                <p className="text-sm sm:text-base text-white/70 leading-relaxed font-medium">
+                <p className="text-sm sm:text-base text-white leading-relaxed font-medium drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
                   Custom DSSAT biophysical models, sealed acoustic transpiration chambers, and real-time stomatal conductance analysis deliver studio-grade agricultural insight.
                 </p>
-                <div className="pt-2 flex items-center gap-6 text-xs font-mono text-white/60">
-                  <span>Root Vigour: <strong className="text-emerald-400">99.2%</strong></span>
-                  <span>Conductance: <strong className="text-teal-300">0.84 mol/m²s</strong></span>
-                </div>
               </motion.div>
             )}
 
@@ -326,28 +330,14 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full max-w-xl ml-auto text-left space-y-5 p-8 sm:p-10 rounded-3xl bg-black/75 backdrop-blur-2xl border border-white/15 shadow-2xl"
+                className="w-full max-w-lg ml-auto text-left space-y-4"
               >
-                <div className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2">
-                  <Activity size={14} />
-                  <span>Adaptive Stress Isolation</span>
-                </div>
-                <h3 className="text-3xl sm:text-5xl font-black text-white leading-tight tracking-tight">
+                <h3 className="text-3xl sm:text-5xl font-black text-white leading-tight tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
                   Adaptive Multispectral <br /> Intelligence, Redefined.
                 </h3>
-                <p className="text-sm sm:text-base text-white/70 leading-relaxed font-medium">
+                <p className="text-sm sm:text-base text-white leading-relaxed font-medium drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
                   Multi-spectral satellite array listens in every direction. Real-time thermal stress analysis adapts to your environment—drought, pests, and yield anomalies fade away.
                 </p>
-                <ul className="space-y-2 text-xs font-mono text-white/80 pt-1">
-                  <li className="flex items-center gap-2 text-emerald-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span>780nm RedEdge Shift Multi-Spectral Array</span>
-                  </li>
-                  <li className="flex items-center gap-2 text-cyan-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                    <span>Real-Time Pathogen Outbreak Isolation</span>
-                  </li>
-                </ul>
               </motion.div>
             )}
 
@@ -359,39 +349,15 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="w-full max-w-3xl mx-auto text-center space-y-6 pointer-events-auto p-8 sm:p-12 rounded-3xl bg-black/80 backdrop-blur-2xl border border-emerald-500/30 shadow-2xl shadow-emerald-500/20"
+                className="w-full max-w-3xl mx-auto text-center space-y-6 pointer-events-auto"
               >
-                <div className="text-xs font-mono font-bold text-teal-400 uppercase tracking-widest flex items-center justify-center gap-2">
-                  <Layers size={14} />
-                  <span>Yield Projection Physics</span>
-                </div>
-                <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-white drop-shadow-2xl">
+                <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">
                   Hear Everything. <br />
-                  <span className="text-emerald-400">Protect Every Harvest.</span>
+                  <span className="text-emerald-400 drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)]">Protect Every Harvest.</span>
                 </h2>
-                <p className="text-base text-white/80 max-w-xl mx-auto font-medium">
+                <p className="text-base text-white/90 max-w-xl mx-auto font-medium drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
                   AgriSage Biophysical Edition. Designed for focus, crafted for smallholders and agronomists worldwide.
                 </p>
-
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-                  <button
-                    type="button"
-                    onClick={onEnterPlatform}
-                    className="btn btn-primary text-sm h-14 px-8 font-bold flex items-center gap-2.5 shadow-2xl shadow-emerald-500/40 hover:scale-105 transition-transform"
-                  >
-                    <span>Experience AgriSage Platform</span>
-                    <ArrowRight size={18} />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={onEnterAuth}
-                    className="btn bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl border border-white/25 text-sm h-14 px-7 font-bold flex items-center gap-2 hover:border-emerald-400 transition-all"
-                  >
-                    <Zap size={16} className="text-amber-400" />
-                    <span>See Full Biophysical Specs</span>
-                  </button>
-                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -416,19 +382,7 @@ export const AppleGrowthScrollytelling: React.FC<AppleGrowthScrollytellingProps>
           )}
         </AnimatePresence>
 
-        {/* Bottom Scroll Progress Bar */}
-        <div className="relative z-30 w-full px-6 pb-6 pointer-events-none">
-          <div className="max-w-7xl mx-auto flex items-center justify-between text-[11px] font-mono text-white/60 mb-2">
-            <span>SCROLL-LINKED SEQUENCE · 441 FRAMES</span>
-            <span>{Math.round(scrollP * 100)}% COMPLETE</span>
-          </div>
-          <div className="max-w-7xl mx-auto h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 shadow-[0_0_12px_rgba(16,185,129,0.8)] transition-all duration-75 ease-out"
-              style={{ width: `${scrollP * 100}%` }}
-            />
-          </div>
-        </div>
+
       </div>
     </div>
   );

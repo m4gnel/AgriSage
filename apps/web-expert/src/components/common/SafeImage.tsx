@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Leaf } from 'lucide-react';
+import { getPublicUrl } from '@/lib/utils';
 
 interface SafeImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackTitle?: string;
@@ -16,7 +17,9 @@ export const SafeImage: React.FC<SafeImageProps> = ({
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  if (hasError || !src) {
+  const resolvedSrc = src ? getPublicUrl(src) : undefined;
+
+  if (hasError || !resolvedSrc) {
     return (
       <div
         className={`flex flex-col items-center justify-center bg-gradient-to-br from-emerald-950/40 to-slate-900 border border-emerald-500/20 text-emerald-400 p-4 text-center select-none ${className}`}
@@ -37,7 +40,7 @@ export const SafeImage: React.FC<SafeImageProps> = ({
         </div>
       )}
       <img
-        src={src}
+        src={resolvedSrc}
         alt={alt}
         className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
         style={style}

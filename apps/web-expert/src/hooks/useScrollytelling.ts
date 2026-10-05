@@ -137,6 +137,7 @@ export function useScrollytelling(containerRef: React.RefObject<HTMLDivElement |
         const velEls = gsap.utils.toArray<HTMLElement>('.velocity-reactive', container);
         if (velEls.length) {
           let lastScroll = 0;
+          let lastSkew = 0;
           const setSkews = velEls.map((el) => gsap.quickTo(el, 'skewY', { duration: 0.3, ease: 'power2.out' }));
 
           ScrollTrigger.create({
@@ -148,7 +149,10 @@ export function useScrollytelling(containerRef: React.RefObject<HTMLDivElement |
               const vel = gsap.utils.clamp(-1, 1, (curr - lastScroll) * 0.0008);
               lastScroll = curr;
               const skewVal = vel * 0.6;
-              setSkews.forEach((setter) => setter(skewVal));
+              if (Math.abs(skewVal - lastSkew) > 0.02 || (skewVal === 0 && lastSkew !== 0)) {
+                lastSkew = skewVal;
+                setSkews.forEach((setter) => setter(skewVal));
+              }
             },
           });
         }

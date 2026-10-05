@@ -3,7 +3,6 @@
 import React, { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import Lenis from '@studio-freight/lenis';
 
 interface ParallaxComponentProps {
   layer1Image?: string;
@@ -58,25 +57,7 @@ export function ParallaxComponent({
       });
     }
 
-    let lenis: Lenis | null = null;
-    try {
-      lenis = new Lenis();
-      lenis.on('scroll', ScrollTrigger.update);
-    } catch {
-      // Graceful fallback if smooth scroll instance is managed globally
-    }
-
-    const updateTicker = (time: number) => {
-      if (lenis) {
-        lenis.raf(time * 1000);
-      }
-    };
-
-    gsap.ticker.add(updateTicker);
-    gsap.ticker.lagSmoothing(0);
-
     return () => {
-      gsap.ticker.remove(updateTicker);
       ScrollTrigger.getAll().forEach((st) => {
         if (st.vars.trigger === triggerElement) {
           st.kill();
@@ -84,9 +65,6 @@ export function ParallaxComponent({
       });
       if (triggerElement) {
         gsap.killTweensOf(triggerElement);
-      }
-      if (lenis) {
-        lenis.destroy();
       }
     };
   }, []);
